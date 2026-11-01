@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "드래그 영역 오토클릭",
+  "version": "1.0.0",
+  "description": "웹페이지에서 드래그로 영역을 선택하고, 선택 범위 안을 일정 속도로 자동 클릭합니다.",
+  "action": {
+    "default_title": "드래그 영역 오토클릭",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab", "scripting", "storage"]
+}
