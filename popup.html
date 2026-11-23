@@ -23,6 +23,12 @@
         <span class="unit">회 / 초</span>
       </div>
 
+      <label for="holdMs">마우스 누름 시간</label>
+      <div class="field-row">
+        <input id="holdMs" type="number" min="1" max="1000" step="1" value="100">
+        <span class="unit">밀리초 (ms)</span>
+      </div>
+
       <label for="mode">클릭 위치</label>
       <select id="mode">
         <option value="random">선택 영역 안의 임의 위치</option>
@@ -43,7 +49,7 @@
     </div>
 
     <div id="status" class="status" role="status" aria-live="polite">상태 확인 중...</div>
-    <p class="note">범위 선택 후 자동으로 시작합니다. 웹페이지의 <strong>Esc</strong> 키나 화면의 <strong>정지</strong> 버튼으로 종료할 수 있습니다.</p>
+    <p class="note">누름 시간은 클릭 주기의 최대 80%까지 적용됩니다. 웨이브는 100ms부터 조절해 보세요. 웹페이지의 <strong>Esc</strong> 키나 <strong>정지</strong> 버튼으로 종료합니다.</p>
   </main>
   <script src="popup.js"></script>
 </body>

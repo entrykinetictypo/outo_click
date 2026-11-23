@@ -7,8 +7,10 @@
   const state = {
     region: null,
     interval: null,
+    releaseTimer: null,
+    pressed: null,
     count: 0,
-    config: { cps: 5, mode: 'random', limit: 0 },
+    config: { cps: 5, mode: 'random', limit: 0, holdMs: 100 },
     selectionOverlay: null,
     highlight: null,
     hud: null,
@@ -22,7 +24,8 @@
     state.config = {
       cps: clamp(Number(input.cps), 1, 30, 5),
       mode: input.mode === 'center' ? 'center' : 'random',
-      limit: Math.floor(clamp(Number(input.limit), 0, 100000, 0))
+      limit: Math.floor(clamp(Number(input.limit), 0, 100000, 0)),
+      holdMs: Math.round(clamp(Number(input.holdMs), 1, 1000, 100))
     };
   }
 
@@ -55,6 +58,8 @@
       window.clearInterval(state.interval);
       state.interval = null;
     }
+    // 정지 중에는 누른 상태가 남지 않도록 mouseup을 보냅니다.
+    releasePressed(false);
     removeDisplay();
   }
 
@@ -175,8 +180,40 @@
     document.addEventListener('keydown', stopKey, true);
   }
 
+  function dispatchPhase(target, base, phase) {
+    const buttons = phase === 'down' ? 1 : 0;
+    if (typeof PointerEvent === 'function') {
+      target.dispatchEvent(new PointerEvent('pointer' + phase, {
+        ...base, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons
+      }));
+    }
+    target.dispatchEvent(new MouseEvent('mouse' + phase, { ...base, buttons }));
+  }
+
+  function releasePressed(completeClick = true) {
+    if (state.releaseTimer != null) {
+      window.clearTimeout(state.releaseTimer);
+      state.releaseTimer = null;
+    }
+    const pressed = state.pressed;
+    if (!pressed) return;
+    state.pressed = null;
+
+    try {
+      dispatchPhase(pressed.target, pressed.base, 'up');
+      // click은 mouseup 이후에만 발행합니다. 누름 상태가 게임 프레임 사이에 유지됩니다.
+      if (!completeClick) return;
+      pressed.target.dispatchEvent(new MouseEvent('click', { ...pressed.base, buttons: 0 }));
+      state.count++;
+      if (state.countLabel) state.countLabel.textContent = `클릭 중 · ${state.count.toLocaleString()}회`;
+      if (state.config.limit > 0 && state.count >= state.config.limit) stop();
+    } catch (err) {
+      console.warn('[드래그 오토클릭] 클릭 해제 실패:', err);
+    }
+  }
+
   function clickOnce() {
-    if (!state.region) return;
+    if (!state.region || state.pressed) return;
     if (state.config.limit > 0 && state.count >= state.config.limit) { stop(); return; }
 
     // 지정 영역은 스크롤 문서 좌표가 아니라 현재 화면(뷰포트) 좌표입니다.
@@ -191,26 +228,21 @@
     const target = document.elementFromPoint(x, y);
     if (!target || state.hud?.contains(target) || state.selectionOverlay?.contains(target)) return;
 
-    // 웹페이지의 DOM 이벤트를 흉내 내는 방식입니다. 브라우저/OS의 실제 마우스 클릭과는 다릅니다.
+    // 웹페이지의 DOM 이벤트를 흉내 내며 실제 OS 마우스 입력은 아닙니다.
     const base = {
       bubbles: true, cancelable: true, composed: true, view: window,
       clientX: x, clientY: y, screenX: window.screenX + x, screenY: window.screenY + y,
       button: 0, detail: 1
     };
     try {
-      if (typeof PointerEvent === 'function') {
-        target.dispatchEvent(new PointerEvent('pointerdown', { ...base, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 1 }));
-      }
-      target.dispatchEvent(new MouseEvent('mousedown', { ...base, buttons: 1 }));
-      if (typeof PointerEvent === 'function') {
-        target.dispatchEvent(new PointerEvent('pointerup', { ...base, pointerId: 1, pointerType: 'mouse', isPrimary: true, buttons: 0 }));
-      }
-      target.dispatchEvent(new MouseEvent('mouseup', { ...base, buttons: 0 }));
-      target.dispatchEvent(new MouseEvent('click', { ...base, buttons: 0 }));
-      state.count++;
-      if (state.countLabel) state.countLabel.textContent = `클릭 중 · ${state.count.toLocaleString()}회`;
-      if (state.config.limit > 0 && state.count >= state.config.limit) stop();
+      state.pressed = { target, base };
+      dispatchPhase(target, base, 'down');
+      if (!state.pressed) return; // mousedown 핸들러에서 정지되었을 수도 있습니다.
+      // 다음 클릭과 겹치지 않도록 CPS 주기의 최대 80%까지만 누릅니다.
+      const holdMs = Math.max(1, Math.min(state.config.holdMs, Math.floor(800 / state.config.cps)));
+      state.releaseTimer = window.setTimeout(() => releasePressed(true), holdMs);
     } catch (err) {
+      releasePressed(false);
       console.warn('[드래그 오토클릭] 클릭 실패:', err);
     }
   }

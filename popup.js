@@ -1,12 +1,13 @@
 const $ = (id) => document.getElementById(id);
-const defaults = { cps: 5, mode: 'random', limit: 0 };
+const defaults = { cps: 5, mode: 'random', limit: 0, holdMs: 100 };
 let currentTabId = null;
 
 const clamp = (n, min, max, fallback) => Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fallback;
 const configFromUI = () => ({
   cps: clamp(Number($('cps').value), 1, 30, defaults.cps),
   mode: $('mode').value === 'center' ? 'center' : 'random',
-  limit: Math.floor(clamp(Number($('limit').value), 0, 100000, defaults.limit))
+  limit: Math.floor(clamp(Number($('limit').value), 0, 100000, defaults.limit)),
+  holdMs: Math.round(clamp(Number($('holdMs').value), 1, 1000, defaults.holdMs))
 });
 
 function status(message, error = false) {
@@ -74,6 +75,7 @@ async function initialize() {
     const stored = await chrome.storage.local.get('clickerConfig');
     const config = { ...defaults, ...(stored.clickerConfig || {}) };
     $('cps').value = config.cps;
+    $('holdMs').value = config.holdMs;
     $('mode').value = config.mode;
     $('limit').value = config.limit;
     await activeTab();
